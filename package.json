@@ -1,0 +1,11 @@
+{
+  "name": "kotoba-chat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Practise Japanese vocabulary through a guided LLM conversation at your JLPT level",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" }
+}

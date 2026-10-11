@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kotoba Chat</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --panel: #ffffff; --ink: #1d1d1f; --muted: #6b6b70; --line: #e4e1d9;
+    --accent: #c8102e; --ok: #2e7d4f; --okbg: #e3f2e8; --warn: #9a6200; --warnbg: #fff4dc;
+    --bubble: #ffffff; --me: #1d1d1f; --meink: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #141416; --panel: #1c1c1f; --ink: #ececef; --muted: #9a9aa2; --line: #2d2d33;
+      --accent: #ff5a6e; --ok: #74d6a0; --okbg: #1b3325; --warn: #f0c066; --warnbg: #3a2e14;
+      --bubble: #232327; --me: #ececef; --meink: #141416;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.55 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif; background: var(--bg); color: var(--ink); }
+  .app { display: grid; grid-template-columns: 320px 1fr; height: 100vh; }
+  aside { background: var(--panel); border-right: 1px solid var(--line); padding: 20px; overflow: auto; display: flex; flex-direction: column; gap: 14px; }
+  h1 { margin: 0; font-size: 20px; letter-spacing: .02em; }
+  h1 span { color: var(--accent); }
+  label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-bottom: 6px; }
+  textarea, input[type=text] { width: 100%; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+  textarea { resize: vertical; min-height: 140px; }
+  .levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .levels button { padding: 8px 0; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 10px; padding: 9px 14px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button[aria-pressed=true] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button:disabled { opacity: .5; cursor: default; }
+  .toggles { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+  .toggles label { display: flex; gap: 8px; align-items: center; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--ink); margin: 0; }
+  .foot { margin-top: auto; font-size: 12px; color: var(--muted); }
+
+  main { display: flex; flex-direction: column; min-height: 0; }
+  .wordbar { padding: 12px 20px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; background: var(--panel); }
+  .wordbar .count { font-size: 13px; color: var(--muted); margin-right: 6px; }
+  .chip { padding: 3px 10px; border-radius: 999px; border: 1px dashed var(--line); font-size: 14px; color: var(--muted); }
+  .chip.used { border: 1px solid var(--ok); background: var(--okbg); color: var(--ok); }
+  #log { flex: 1; overflow: auto; padding: 24px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .empty { margin: auto; text-align: center; color: var(--muted); max-width: 380px; }
+  .msg { max-width: 680px; }
+  .msg.bot { align-self: flex-start; }
+  .msg.me { align-self: flex-end; }
+  .bubble { padding: 12px 16px; border-radius: 16px; background: var(--bubble); border: 1px solid var(--line); }
+  .me .bubble { background: var(--me); color: var(--meink); border-color: var(--me); }
+  .jp { font-size: 20px; line-height: 2.1; }
+  .me .jp { line-height: 1.5; }
+  rt { font-size: 10px; color: var(--muted); }
+  body.no-furi rt { display: none; }
+  .en { margin-top: 4px; color: var(--muted); font-size: 14px; }
+  body.hide-en .en { filter: blur(5px); cursor: pointer; user-select: none; }
+  body.hide-en .en.show { filter: none; }
+  .tools { display: flex; gap: 6px; margin-top: 6px; }
+  .tools button { padding: 3px 10px; font-size: 12px; border-radius: 8px; }
+  .hint { margin-top: 6px; font-size: 13px; color: var(--muted); font-style: italic; }
+  .corr { background: var(--warnbg); color: var(--warn); border-radius: 12px; padding: 8px 12px; font-size: 14px; margin-bottom: 8px; }
+  .done { align-self: center; background: var(--okbg); color: var(--ok); padding: 8px 16px; border-radius: 999px; font-weight: 600; }
+  .err { align-self: center; color: var(--accent); font-size: 14px; }
+  .typing { color: var(--muted); font-size: 14px; }
+  form.composer { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--line); background: var(--panel); }
+  form.composer input { flex: 1; font-size: 17px; }
+
+  @media (max-width: 800px) {
+    .app { grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+    aside { border-right: 0; border-bottom: 1px solid var(--line); }
+    main { height: 100vh; }
+  }
+</style>
+</head>
+<body class="hide-en">
+<div class="app">
+  <aside>
+    <h1>言葉 <span>Kotoba Chat</span></h1>
+    <div>
+      <label for="words">Words to practise</label>
+      <textarea id="words" placeholder="One per line or comma-separated&#10;天気&#10;傘&#10;持っていく&#10;たぶん"></textarea>
+    </div>
+    <div>
+      <label>JLPT level</label>
+      <div class="levels" id="levels"></div>
+    </div>
+    <div>
+      <label for="scenario">Scenario (optional)</label>
+      <input id="scenario" type="text" placeholder="e.g. chatting with a coworker in Osaka" />
+    </div>
+    <button class="primary" id="start">Start conversation</button>
+    <div class="toggles">
+      <label><input type="checkbox" id="furi" checked /> Show furigana</label>
+      <label><input type="checkbox" id="showEn" /> Always show English</label>
+      <label><input type="checkbox" id="autoSpeak" /> Read replies aloud</label>
+    </div>
+    <div class="foot" id="foot">Model: …</div>
+  </aside>
+
+  <main>
+    <div class="wordbar" id="wordbar"><span class="count">No words yet</span></div>
+    <div id="log"><div class="empty">Add your words, pick a level and press <b>Start</b>.<br />Answer in Japanese (or English when stuck) — your partner steers the conversation until every word has come up.</div></div>
+    <form class="composer" id="composer">
+      <input id="input" type="text" autocomplete="off" placeholder="日本語で答えてください…" disabled lang="ja" />
+      <button class="primary" id="send" disabled>Send</button>
+    </form>
+  </main>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const LEVELS = ['N5', 'N4', 'N3', 'N2', 'N1'];
+const state = { words: [], level: 'N4', scenario: '', messages: [], used: new Set(), tokens: 0, busy: false, finished: false };
+
+// settings persistence (local app)
+const saved = (() => { try { return JSON.parse(localStorage.getItem('kotoba') || '{}'); } catch { return {}; } })();
+$('words').value = saved.words || '';
+$('scenario').value = saved.scenario || '';
+state.level = saved.level || 'N4';
+$('furi').checked = saved.furi ?? true;
+$('showEn').checked = !!saved.showEn;
+$('autoSpeak').checked = !!saved.autoSpeak;
+function persist() {
+  try {
+    localStorage.setItem('kotoba', JSON.stringify({
+      words: $('words').value, scenario: $('scenario').value, level: state.level,
+      furi: $('furi').checked, showEn: $('showEn').checked, autoSpeak: $('autoSpeak').checked,
+    }));
+  } catch {}
+}
+
+for (const lv of LEVELS) {
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = lv;
+  b.onclick = () => { state.level = lv; renderLevels(); persist(); };
+  $('levels').appendChild(b);
+}
+function renderLevels() { [...$('levels').children].forEach((b) => b.setAttribute('aria-pressed', b.textContent === state.level)); }
+renderLevels();
+
+function applyToggles() {
+  document.body.classList.toggle('no-furi', !$('furi').checked);
+  document.body.classList.toggle('hide-en', !$('showEn').checked);
+  persist();
+}
+['furi', 'showEn', 'autoSpeak'].forEach((id) => $(id).addEventListener('change', applyToggles));
+applyToggles();
+
+fetch('/api/config').then((r) => r.json()).then((c) => { state.model = c.model; updateFoot(); }).catch(() => {});
+function updateFoot() { $('foot').textContent = `Model: ${state.model || '?'} · tokens this session: ${state.tokens.toLocaleString()}`; }
+
+// helpers
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const RUBY = /\{([^{}|]+)\|([^{}]*)\}/g;
+const toRuby = (s) => esc(s).replace(RUBY, (_, base, rt) => rt ? `<ruby>${base}<rt>${rt}</rt></ruby>` : base);
+const plain = (s) => s.replace(RUBY, '$1');
+const parseWords = (s) => [...new Set(s.split(/[\n,、，;]+/).map((w) => w.trim()).filter(Boolean))];
+const remaining = () => state.words.filter((w) => !state.used.has(w));
+
+function speak(text) {
+  if (!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ja-JP'; u.rate = 0.9;
+  const v = speechSynthesis.getVoices().find((v) => v.lang?.startsWith('ja'));
+  if (v) u.voice = v;
+  speechSynthesis.speak(u);
+}
+
+function markUsed(list, ...texts) {
+  for (const w of list) if (state.words.includes(w.trim())) state.used.add(w.trim());
+  for (const t of texts) for (const w of state.words) if (t.includes(w)) state.used.add(w);
+  renderChips();
+}
+
+function renderChips() {
+  const bar = $('wordbar');
+  bar.innerHTML = '';
+  const c = document.createElement('span');
+  c.className = 'count';
+  c.textContent = state.words.length ? `${state.used.size} / ${state.words.length} used` : 'No words yet';
+  bar.appendChild(c);
+  for (const w of state.words) {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (state.used.has(w) ? ' used' : '');
+    chip.textContent = w;
+    bar.appendChild(chip);
+  }
+}
+
+function add(el) {
+  const log = $('log');
+  log.querySelector('.empty')?.remove();
+  log.appendChild(el);
+  log.scrollTop = log.scrollHeight;
+  return el;
+}
+const div = (cls, text) => Object.assign(document.createElement('div'), { className: cls, textContent: text });
+
+function renderUser(text) {
+  const m = div('msg me');
+  m.innerHTML = `<div class="bubble jp" lang="ja">${esc(text)}</div>`;
+  add(m);
+}
+
+function renderBot(r) {
+  const m = div('msg bot');
+  let html = '';
+  if (r.correction) {
+    html += `<div class="corr">✎ <b>${esc(r.correction.corrected)}</b>` +
+      (r.correction.original ? `<br><s>${esc(r.correction.original)}</s>` : '') +
+      (r.correction.explanation ? `<br>${esc(r.correction.explanation)}` : '') + `</div>`;
+  }
+  html += `<div class="bubble"><div class="jp" lang="ja">${toRuby(r.japanese)}</div>` +
+    `<div class="en">${esc(r.english)}</div>` +
+    `<div class="tools"><button type="button" data-a="speak">🔊 Listen</button>` +
+    (r.hint ? `<button type="button" data-a="hint">Hint</button>` : '') + `</div>` +
+    (r.hint ? `<div class="hint" hidden>${esc(r.hint)}</div>` : '') + `</div>`;
+  m.innerHTML = html;
+  m.querySelector('[data-a=speak]').onclick = () => speak(plain(r.japanese));
+  m.querySelector('[data-a=hint]')?.addEventListener('click', () => { const h = m.querySelector('.hint'); h.hidden = !h.hidden; });
+  m.querySelector('.en').onclick = (e) => e.currentTarget.classList.toggle('show');
+  add(m);
+  if ($('autoSpeak').checked) speak(plain(r.japanese));
+}
+
+function setBusy(b) {
+  state.busy = b;
+  $('input').disabled = b || !state.words.length;
+  $('send').disabled = b || !state.words.length;
+  $('start').disabled = b;
+  if (!b) $('input').focus();
+}
+
+async function turn() {
+  setBusy(true);
+  const typing = add(div('typing', '入力中…'));
+  try {
+    const res = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ words: state.words, remaining: remaining(), level: state.level, scenario: state.scenario, messages: state.messages }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    const r = data.reply;
+    state.messages.push({ role: 'assistant', content: JSON.stringify(r) });
+    if (data.usage) state.tokens += (data.usage.prompt_tokens || 0) + (data.usage.completion_tokens || 0);
+    updateFoot();
+    typing.remove();
+    const lastUser = [...state.messages].reverse().find((m) => m.role === 'user')?.content || '';
+    markUsed(r.used_words, plain(r.japanese), lastUser);
+    renderBot(r);
+    if ((r.finished || remaining().length === 0) && !state.finished) {
+      state.finished = true;
+      add(div('done', '🎉 All words used — keep chatting or start a new list'));
+    }
+  } catch (err) {
+    typing.remove();
+    add(div('err', 'Error: ' + err.message));
+  } finally {
+    setBusy(false);
+  }
+}
+
+$('start').onclick = () => {
+  const words = parseWords($('words').value);
+  if (!words.length) { $('words').focus(); return; }
+  Object.assign(state, { words, scenario: $('scenario').value.trim(), messages: [], used: new Set(), finished: false });
+  persist();
+  $('log').innerHTML = '';
+  renderChips();
+  turn();
+};
+
+$('composer').onsubmit = (e) => {
+  e.preventDefault();
+  const text = $('input').value.trim();
+  if (!text || state.busy) return;
+  $('input').value = '';
+  state.messages.push({ role: 'user', content: text });
+  renderUser(text);
+  turn();
+};
+</script>
+</body>
+</html>
